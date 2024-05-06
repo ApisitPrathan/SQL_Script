@@ -1,0 +1,1 @@
+select * into SF_TbInvoicex from [10.92.0.198].[Rapid4New].[dbo].SF_TbInvoice

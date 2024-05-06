@@ -1,0 +1,7 @@
+select *
+from #sum
+where #sum.Parent_Child_Asset_Information NOT in 
+(
+	SELECT  Asset_Number
+	from #machin
+)

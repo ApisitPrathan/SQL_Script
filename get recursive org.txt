@@ -1,0 +1,19 @@
+WITH tblParent AS
+		(
+			SELECT CN AS Employee
+				,REPLACE( SUBSTRING(a.MANAGER, 1 , CHARINDEX(',', a.MANAGER + ',' ) -1),'CN=','') as Manager
+				--,REPLACE( substring(a.MANAGER,1,CHARINDEX(',',a.MANAGER)-1),'CN=','') as Manager
+				,MAIL
+				,0 AS Lvl
+			FROM [AD_LDAP] a
+			WHERE DISPLAYNAME like '%'+@Display_Name+'%'
+			UNION ALL
+			SELECT b.CN AS Employee
+				,REPLACE( SUBSTRING(b.MANAGER, 1 , CHARINDEX(',', b.MANAGER + ',' ) -1),'CN=','') as Manager
+				--,REPLACE( substring(b.MANAGER,1,CHARINDEX(',',b.MANAGER)-1),'CN=','') as Manager
+				,b.MAIL
+				,Lvl + 1 AS Lvl
+			FROM [AD_LDAP] b
+			JOIN tblParent ON b.CN = tblParent.Manager
+		)
+		SELECT * FROM  tblParent

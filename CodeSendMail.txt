@@ -1,0 +1,153 @@
+ public void SendMailAll(string TranSubID)
+        {
+            //Send Email
+
+            // Check PersonType
+            // get Email
+            StringBuilder strSqlSendEmail = new StringBuilder();
+           
+            strSqlSendEmail.Append(" select " +
+                " distinct a.TranSubID,c.FormDetailName,a.UserName,b.MAIL  " +
+                " from QF_SRF_Form_Log a left outer join AD_LDAP b on a.UserName=REPLACE(REPLACE(b.DISPLAYNAME,' (FBTH THA)',''),' (FXTH THA)','') " +
+                " inner join QF_SRF_Tran_Sub c on a.TranSubID=c.ID " +
+                " where 1=1 and b.MAIL<>'' " +
+                " and a.PersonType<>'Approver' " +
+            string.Format(" and a.TranSubID ='{0}'", TranSubID.Trim()) +
+                "");
+            strSqlSendEmail.Append(" Union ");
+            strSqlSendEmail.Append(" select " +
+               " distinct a.TranSubID,c.FormDetailName,a.Represent as UserName,b.MAIL  " +
+               " from QF_SRF_Form_Log a left outer join AD_LDAP b on a.Represent=REPLACE(REPLACE(b.DISPLAYNAME,' (FBTH THA)',''),' (FXTH THA)','') " +
+               " inner join QF_SRF_Tran_Sub c on a.TranSubID=c.ID " +
+               " where 1=1 and b.MAIL<>'' " +
+               " and a.PersonType<>'Approver' " +
+           string.Format(" and a.Seq<>0 and a.TranSubID ='{0}'", TranSubID.Trim()) +
+               "");
+
+
+            //Send mail
+            var xMailList = db.Database.SqlQuery<MOD_GetEmail>(strSqlSendEmail.ToString()).ToList();
+        
+
+            String senderEmail = String.Empty;
+            senderEmail = "srf-auto-robot@fujifilm.com";
+            SmtpClient smtp = new SmtpClient();
+            smtp.UseDefaultCredentials = false;
+            smtp.Credentials = new NetworkCredential("anonymousm", "");
+            smtp.Port = 25;
+            smtp.EnableSsl = false;
+            smtp.Host = "mailhost.sgp.fujixerox.com";
+
+            MailMessage email = new MailMessage();
+            email.From = new System.Net.Mail.MailAddress(senderEmail);
+            StringBuilder strHtmlBody = new StringBuilder();
+
+            foreach (var item in xMailList)
+            {
+               
+                
+                if (item.MAIL == "hiroaki.abe.ny@fujifilm.com")
+                {
+                    email.To.Add("lakkhana.s.dy@fujifilm.com");
+                }
+                if (item.MAIL == "kalaya.p.ur@fujifilm.com")
+                {
+                    email.To.Add("thongthip.s.zw@fujifilm.com");
+                }
+                if (item.MAIL == "masaaki.yanagiya.hw@fujifilm.com")
+                {
+                    email.To.Add("chula.s.vp@fujifilm.com");
+                }
+                email.To.Add(item.MAIL);
+               
+            }
+            //get mail CC
+            StringBuilder strGetMailCC = new StringBuilder();
+            strGetMailCC.Append("select b.CC_Mail as MAIL from QF_SRF_Tran_Sub a " +
+                " inner join QF_SRF_Tran b on a.SRF_No=b.SRF_No " +
+                " where b.CC_Mail <>'' and a.ID='" + TranSubID + "'"
+                );
+            var xMailCCList = db.Database.SqlQuery<MOD_GetEmail>(strGetMailCC.ToString()).ToList();
+            if (xMailCCList.Count>0)
+            {
+                foreach (var item in xMailCCList)
+                {
+                    email.CC.Add(item.MAIL);
+                }
+            }
+           
+
+            string cusid = "";
+            string cusname = "";
+            string strFormDetailName = "";
+            StringBuilder strGetCus = new StringBuilder();
+            strGetCus.Append(" select a.FormDetailName,b.Customer_ID,b.Customer_Name,b.Customer_Address " +
+                " from QF_SRF_Tran_Sub a left outer join  QF_SRF_Tran b on a.SRF_No = b.SRF_No " +
+                " where 1=1 and " +
+                " a.ID='" + TranSubID + "'"
+                );
+            var xCusList = db.Database.SqlQuery<MOD_GetCus>(strGetCus.ToString()).ToList();
+            foreach (var item in xCusList)
+            {
+                strFormDetailName = item.FormDetailName;
+                cusid = item.Customer_ID;
+                cusname = item.Customer_Name;
+            }
+
+            email.Subject = string.Format("Emailing SRF Detail No {0} for approval from the automated robot", TranSubID.ToString());
+            strHtmlBody.Append("<p>Dear all,</P>");
+            strHtmlBody.Append(string.Format("<p>Subject Detail : {0}</P>", strFormDetailName));
+            strHtmlBody.Append(string.Format("<p>Customer ID : {0}</P>", cusid));
+            strHtmlBody.Append(string.Format("<p>Customer Name : {0}</P>", cusname));
+            //Create body
+            StringBuilder strCreateBody = new StringBuilder();
+            strCreateBody.Append(" select " +
+                " a.Comment,a.PersonType,a.UserName,a.Represent,a.Status,a.Seq " +
+                " from QF_SRF_Form_Log a " +
+                " where 1=1 " +
+            string.Format(" and a.TranSubID ='{0}'", TranSubID.Trim()) +
+                " order by a.Seq,a.Seqfw "
+                );
+
+
+            var xCBody = db.Database.SqlQuery<MOD_CreateMailBody>(strCreateBody.ToString()).ToList();
+
+
+
+
+
+            strHtmlBody.Append("<table style='width: 100%;' border='1'>" +
+                                    "<tr style='font-weight: 700; background-color: #66CCFF;'>" +
+                                        " <td>Comment</td>" +
+                                        " <td>Person Type</td>" +
+                                        " <td>Person</td>" +
+                                        " <td>Representative</td>" +
+                                        " <td>Status</td>" +
+                                        " <td>Seq.</td>" +
+                                    "</tr>");
+            foreach (var item in xCBody)
+            {
+                strHtmlBody.Append("<tr style='background-color: #DDDDDD'>" +
+                    string.Format(" <td>{0}</td>", item.Comment) +
+                    string.Format(" <td>{0}</td>", item.PersonType) +
+                    string.Format(" <td>{0}</td>", item.UserName) +
+                    string.Format(" <td>{0}</td>", item.Represent) +
+                    string.Format(" <td>{0}</td>", item.Status) +
+                    string.Format(" <td>{0}</td>", item.Seq) +
+                                "</tr>");
+            }
+
+            strHtmlBody.Append("</table>");
+        
+            strHtmlBody.Append("<p><a href='http://tha-rpfl4-ap/Zukami/compositeview.aspx?AppID=eaee48cf-eaf1-44de-9b3c-206ce8486a90&ID=eb11b955-088e-4214-bd3e-27127194a2c9'>Click to view eSRF list</a></p>");
+            strHtmlBody.Append("<p>Best regards,</p>");
+            strHtmlBody.Append("<p>FBTH Information Management</p>");
+            email.Body = strHtmlBody.ToString();
+            email.IsBodyHtml = true;
+            // email.Body = @"\\10.92.0.198\srfdoc\SRF210100001.pdf";
+            
+            smtp.Send(email);
+
+
+
+  }
